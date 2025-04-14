@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>煤炭监测 Modbus 服务器模拟器</title>
+  
+  <!-- Bootstrap CSS (使用直接链接避免路径问题) -->
+  <style>
+    /* 使用内联Bootstrap样式，避免路径问题 */
+    @import url('./node_modules/bootstrap/dist/css/bootstrap.min.css');
+    @import url('./node_modules/@fortawesome/fontawesome-free/css/all.min.css');
+  </style>
+  
+  <!-- 原始样式保持不变 -->
+  <style>
+    :root {
+      --primary-color: #0d6efd;
+      --secondary-color: #6c757d;
+      --success-color: #198754;
+      --warning-color: #ffc107;
+      --danger-color: #dc3545;
+      --light-color: #f8f9fa;
+      --dark-color: #212529;
+      --bg-gray: #f5f7f9;
+      --border-radius: 8px;
+      --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      --transition-speed: 0.3s;
+    }
+    
+    body {
+      font-family: 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', Tahoma, sans-serif;
+      background-color: var(--bg-gray);
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .card {
+      border-radius: var(--border-radius);
+      box-shadow: var(--box-shadow);
+      transition: all var(--transition-speed);
+      background-color: white;
+      border: none;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .card:hover {
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    .card-header {
+      background-color: #ffffff;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+      font-weight: 600;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .card-body {
+      flex: 1;
+      overflow: auto;
+      padding: 1rem;
+    }
+    
+    .navbar {
+      background-color: var(--primary-color);
+      padding: 0.75rem 1.5rem;
+      color: white;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .navbar-brand {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: white;
+    }
+    
+    .nav-status {
+      display: flex;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+    
+    .status-badge {
+      display: inline-block;
+      padding: 0.35em 0.65em;
+      font-size: 0.75em;
+      font-weight: 700;
+      line-height: 1;
+      text-align: center;
+      white-space: nowrap;
+      vertical-align: baseline;
+      border-radius: 50rem;
+      margin-left: 0.5rem;
+    }
+    
+    .badge-running {
+      background-color: var(--success-color);
+      color: white;
+    }
+    
+    .badge-stopped {
+      background-color: var(--danger-color);
+      color: white;
+    }
+    
+    .badge-error {
+      background-color: var(--warning-color);
+      color: black;
+    }
+    
+    .main-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 1rem;
+      gap: 1rem;
+    }
+    
+    .row {
+      margin: 0;
+    }
+    
+    .tab-content {
+      height: 100%;
+      overflow: hidden;
+    }
+    
+    .tab-pane {
+      height: 100%;
+      overflow: auto;
+    }
+    
+    .nav-tabs {
+      border-bottom: 1px solid #dee2e6;
+    }
+    
+    .nav-tabs .nav-link {
+      margin-bottom: -1px;
+      border: 1px solid transparent;
+      border-top-left-radius: 0.25rem;
+      border-top-right-radius: 0.25rem;
+      color: var(--secondary-color);
+    }
+    
+    .nav-tabs .nav-link:hover {
+      border-color: #e9ecef #e9ecef #dee2e6;
+    }
+    
+    .nav-tabs .nav-link.active {
+      color: var(--primary-color);
+      background-color: #fff;
+      border-color: #dee2e6 #dee2e6 #fff;
+      font-weight: 600;
+    }
+    
+    .table {
+      margin-bottom: 0;
+    }
+    
+    .table > :not(caption) > * > * {
+      padding: 0.5rem;
+    }
+    
+    .highlight {
+      animation: highlight 2s ease-in-out;
+    }
+    
+    @keyframes highlight {
+      0% { background-color: rgba(255, 193, 7, 0.4); }
+      100% { background-color: transparent; }
+    }
+    
+    .register-value {
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      transition: background-color 0.2s;
+    }
+    
+    .register-value:hover {
+      background-color: #e9ecef;
+    }
+    
+    .log-container {
+      background-color: #1e1e1e;
+      color: #d4d4d4;
+      font-family: Consolas, monospace;
+      font-size: 0.85rem;
+      padding: 0.5rem;
+      border-radius: var(--border-radius);
+      overflow-y: auto;
+      white-space: pre-wrap;
+      height: 100%;
+    }
+    
+    .log-info {
+      color: #9cdcfe;
+    }
+    
+    .log-error {
+      color: #f14c4c;
+    }
+    
+    .log-success {
+      color: #6a9955;
+    }
+    
+    .log-message {
+      margin-bottom: 0.25rem;
+      line-height: 1.4;
+    }
+    
+    .modal-content {
+      border-radius: var(--border-radius);
+      border: none;
+    }
+    
+    .modal-header {
+      background-color: var(--primary-color);
+      color: white;
+      border-top-left-radius: var(--border-radius);
+      border-top-right-radius: var(--border-radius);
+    }
+    
+    .bit-value {
+      display: inline-block;
+      width: 40px;
+      height: 40px;
+      line-height: 40px;
+      text-align: center;
+      border-radius: 4px;
+      margin: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    
+    .bit-value.active {
+      background-color: #d1e7dd;
+      color: #146c43;
+      border: 1px solid #a3cfbb;
+    }
+    
+    .bit-value.inactive {
+      background-color: #f8d7da;
+      color: #b02a37;
+      border: 1px solid #f1aeb5;
+    }
+    
+    .bit-value:hover {
+      transform: scale(1.05);
+    }
+    
+    .network-info {
+      padding: 0.25rem 0.5rem;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+      font-size: 0.85rem;
+      margin-left: 1rem;
+    }
+    
+    .register-description {
+      font-size: 0.85rem;
+      color: #6c757d;
+      display: block;
+    }
+    
+    .chart-container {
+      width: 100%;
+      height: 300px;
+      position: relative;
+    }
+    
+    .text-highlight {
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+    
+    /* 自定义滚动条 */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: #f1f1f1;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: #c1c1c1;
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: #a8a8a8;
+    }
+    
+    /* Python代码生成 */
+    .python-code {
+      font-family: Consolas, monospace;
+      background-color: #1e1e1e;
+      color: #d4d4d4;
+      padding: 1rem;
+      border-radius: var(--border-radius);
+      overflow: auto;
+      max-height: 300px;
+      white-space: pre;
+    }
+    
+    /* 历史记录表格 */
+    .history-table-container {
+      max-height: 300px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <!-- 导航栏 -->
+  <nav class="navbar">
+    <div class="container-fluid">
+      <span class="navbar-brand">
+        <i class="fas fa-cogs me-2"></i>煤炭监测 Modbus 服务器模拟器
+      </span>
+      <div class="nav-status">
+        <span>服务器状态:</span>
+        <span id="server-status" class="status-badge badge-stopped">已停止</span>
+        <span id="network-info" class="network-info"></span>
+      </div>
+    </div>
+  </nav>
+  
+  <!-- 主容器 -->
+  <div class="main-container">
+    <!-- 第一行: 控制面板和点表 -->
+    <div class="row flex-grow-0 mb-3">
+      <!-- 控制面板 -->
+      <div class="col-md-4">
+        <div class="card">
+          <div class="card-header">
+            <span><i class="fas fa-sliders-h me-2"></i>控制面板</span>
+          </div>
+          <div class="card-body">
+            <div class="mb-3">
+              <label for="port" class="form-label">端口号:</label>
+              <div class="input-group">
+                <input type="number" class="form-control" id="port" value="502" min="1" max="65535">
+                <button id="start-server" class="btn btn-primary"><i class="fas fa-play me-1"></i>启动服务器</button>
+                <button id="stop-server" class="btn btn-danger" disabled><i class="fas fa-stop me-1"></i>停止服务器</button>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="display-format" class="form-label">显示格式:</label>
+              <select id="display-format" class="form-select">
+                <option value="dec">十进制</option>
+                <option value="hex">十六进制</option>
+                <option value="bin">二进制</option>
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label class="form-label">快捷操作:</label>
+              <div class="d-grid gap-2">
+                <button id="refresh-data-btn" class="btn btn-outline-info">
+                  <i class="fas fa-sync-alt me-1"></i>刷新寄存器数据
+                </button>
+                <button id="generate-python-btn" class="btn btn-outline-primary">
+                  <i class="fab fa-python me-1"></i>生成Python测试脚本
+                </button>
+                <button id="clear-alarms-btn" class="btn btn-outline-success">
+                  <i class="fas fa-broom me-1"></i>清除所有报警
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- 点表 -->
+      <div class="col-md-8">
+        <div class="card">
+          <div class="card-header">
+            <span><i class="fas fa-table me-2"></i>煤炭监测点表</span>
+            <div class="float-end">
+              <button id="export-csv-btn" class="btn btn-sm btn-outline-secondary">
+                <i class="fas fa-file-csv me-1"></i>导出CSV
+              </button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead>
+                  <tr>
+                    <th>地址</th>
+                    <th>实际地址</th>
+                    <th>名称</th>
+                    <th>读写方式</th>
+                    <th>当前值</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="point-table-body">
+                  <!-- 点表内容将通过JavaScript动态填充 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 第二行: 多标签页显示 -->
+    <div class="row flex-grow-1">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs" id="mainTabs" role="tablist">
+              <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="registers-tab" data-bs-toggle="tab" data-bs-target="#registers" type="button" role="tab" aria-controls="registers" aria-selected="true">
+                  <i class="fas fa-microchip me-1"></i>其他寄存器
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="logs-tab" data-bs-toggle="tab" data-bs-target="#logs" type="button" role="tab" aria-controls="logs" aria-selected="false">
+                  <i class="fas fa-terminal me-1"></i>通信日志
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="tab" data-bs-target="#history" type="button" role="tab" aria-controls="history" aria-selected="false">
+                  <i class="fas fa-history me-1"></i>变化历史
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="chart-tab" data-bs-toggle="tab" data-bs-target="#chart" type="button" role="tab" aria-controls="chart" aria-selected="false">
+                  <i class="fas fa-chart-line me-1"></i>数据图表
+                </button>
+              </li>
+              <li class="nav-item" role="presentation">
+                <button class="nav-link" id="help-tab" data-bs-toggle="tab" data-bs-target="#help" type="button" role="tab" aria-controls="help" aria-selected="false">
+                  <i class="fas fa-question-circle me-1"></i>帮助
+                </button>
+              </li>
+            </ul>
+          </div>
+          <div class="card-body">
+            <div class="tab-content" id="mainTabsContent">
+              <!-- 寄存器标签页 -->
+              <div class="tab-pane fade show active" id="registers" role="tabpanel" aria-labelledby="registers-tab">
+                <ul class="nav nav-pills mb-3" id="registerTabs" role="tablist">
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="holding-tab" data-bs-toggle="pill" data-bs-target="#holding" type="button" role="tab" aria-controls="holding" aria-selected="true">
+                      保持寄存器
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="input-tab" data-bs-toggle="pill" data-bs-target="#input" type="button" role="tab" aria-controls="input" aria-selected="false">
+                      输入寄存器
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="coils-tab" data-bs-toggle="pill" data-bs-target="#coils" type="button" role="tab" aria-controls="coils" aria-selected="false">
+                      线圈
+                    </button>
+                  </li>
+                  <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="discrete-tab" data-bs-toggle="pill" data-bs-target="#discrete" type="button" role="tab" aria-controls="discrete" aria-selected="false">
+                      离散输入
+                    </button>
+                  </li>
+                </ul>
+                <div class="tab-content" id="registerTabsContent">
+                  <div class="tab-pane fade show active" id="holding" role="tabpanel" aria-labelledby="holding-tab">
+                    <div class="table-responsive">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>地址</th>
+                            <th>实际地址</th>
+                            <th>值</th>
+                          </tr>
+                        </thead>
+                        <tbody id="holding-table-body">
+                          <!-- 保持寄存器内容将通过JavaScript动态填充 -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="tab-pane fade" id="input" role="tabpanel" aria-labelledby="input-tab">
+                    <div class="table-responsive">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>地址</th>
+                            <th>实际地址</th>
+                            <th>值</th>
+                          </tr>
+                        </thead>
+                        <tbody id="input-table-body">
+                          <!-- 输入寄存器内容将通过JavaScript动态填充 -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="tab-pane fade" id="coils" role="tabpanel" aria-labelledby="coils-tab">
+                    <div class="table-responsive">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>地址</th>
+                            <th>实际地址</th>
+                            <th>值</th>
+                          </tr>
+                        </thead>
+                        <tbody id="coils-table-body">
+                          <!-- 线圈内容将通过JavaScript动态填充 -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="tab-pane fade" id="discrete" role="tabpanel" aria-labelledby="discrete-tab">
+                    <div class="table-responsive">
+                      <table class="table table-hover">
+                        <thead>
+                          <tr>
+                            <th>地址</th>
+                            <th>实际地址</th>
+                            <th>值</th>
+                          </tr>
+                        </thead>
+                        <tbody id="discrete-table-body">
+                          <!-- 离散输入内容将通过JavaScript动态填充 -->
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 通信日志标签页 -->
+              <div class="tab-pane fade" id="logs" role="tabpanel" aria-labelledby="logs-tab">
+                <div class="d-flex mb-2">
+                  <button id="clear-log-btn" class="btn btn-sm btn-outline-secondary me-2">
+                    <i class="fas fa-eraser me-1"></i>清除日志
+                  </button>
+                  <div class="form-check form-switch ms-auto">
+                    <input class="form-check-input" type="checkbox" id="auto-scroll-check" checked>
+                    <label class="form-check-label" for="auto-scroll-check">自动滚动</label>
+                  </div>
+                </div>
+                <div class="log-container" id="log-container">
+                  <!-- 日志内容将通过JavaScript动态填充 -->
+                </div>
+              </div>
+              
+              <!-- 变化历史标签页 -->
+              <div class="tab-pane fade" id="history" role="tabpanel" aria-labelledby="history-tab">
+                <div class="mb-3">
+                  <button id="clear-history-btn" class="btn btn-sm btn-outline-secondary">
+                    <i class="fas fa-eraser me-1"></i>清除历史记录
+                  </button>
+                  <button id="export-history-btn" class="btn btn-sm btn-outline-primary ms-2">
+                    <i class="fas fa-file-export me-1"></i>导出历史记录
+                  </button>
+                </div>
+                <div class="history-table-container">
+                  <table class="table table-hover">
+                    <thead>
+                      <tr>
+                        <th>时间</th>
+                        <th>地址</th>
+                        <th>名称</th>
+                        <th>旧值</th>
+                        <th>新值</th>
+                      </tr>
+                    </thead>
+                    <tbody id="history-table-body">
+                      <!-- 历史记录内容将通过JavaScript动态填充 -->
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <!-- 数据图表标签页 -->
+              <div class="tab-pane fade" id="chart" role="tabpanel" aria-labelledby="chart-tab">
+                <div class="mb-3">
+                  <label for="chart-register-select" class="form-label">选择监控寄存器:</label>
+                  <select id="chart-register-select" class="form-select" multiple>
+                    <!-- 寄存器选项将通过JavaScript动态填充 -->
+                  </select>
+                </div>
+                <div class="chart-container">
+                  <canvas id="register-chart"></canvas>
+                </div>
+              </div>
+              
+              <!-- 帮助标签页 -->
+              <div class="tab-pane fade" id="help" role="tabpanel" aria-labelledby="help-tab">
+                <div class="card">
+                  <div class="card-header">
+                    <h5 class="mb-0">使用说明</h5>
+                  </div>
+                  <div class="card-body">
+                    <h6>关于此模拟器</h6>
+                    <p>
+                      这是一个煤炭监测系统的Modbus TCP服务器模拟器，用于模拟煤炭监测系统的数据采集和报警功能。
+                      可以用作测试上位机软件、客户端程序或其他Modbus设备的工具。
+                    </p>
+                    
+                    <h6>点表说明</h6>
+                    <ul>
+                      <li><strong>40001 (煤量)</strong>: 可读写的数值寄存器，表示煤量</li>
+                      <li><strong>40002 (跑偏)</strong>: 可读写的状态寄存器，1表示报警状态</li>
+                      <li><strong>40003 (大块)</strong>: 可读写的状态寄存器，1表示报警状态</li>
+                      <li><strong>40004 (烟雾)</strong>: 可读写的状态寄存器，1表示报警状态</li>
+                      <li><strong>40005 (人员越位)</strong>: 可读写的状态寄存器，1表示报警状态</li>
+                      <li><strong>40006-40007 (备用)</strong>: 可读写的备用寄存器</li>
+                      <li><strong>40008 (报警使能)</strong>: 控制报警是否启用
+                        <ul>
+                          <li>bit0: 大块报警使能</li>
+                          <li>bit1: 异物报警使能</li>
+                          <li>bit2: 人员越界报警使能</li>
+                          <li>bit3: 跑偏报警使能</li>
+                        </ul>
+                      </li>
+                      <li><strong>40009 (异物)</strong>: 可读写的状态寄存器，1表示报警状态</li>
+                    </ul>
+                    
+                    <h6>基本使用方法</h6>
+                    <ol>
+                      <li>设置端口号（默认502），点击"启动服务器"</li>
+                      <li>查看服务器状态和本机IP地址</li>
+                      <li>通过点表查看和修改寄存器值</li>
+                      <li>查看通信日志了解设备交互情况</li>
+                      <li>可生成Python测试脚本进行自动化测试</li>
+                    </ol>
+                    
+                    <h6>功能说明</h6>
+                    <ul>
+                      <li><strong>变化高亮</strong>: 当寄存器值发生变化时，对应的单元格会高亮显示</li>
+                      <li><strong>格式切换</strong>: 可在十进制、十六进制和二进制格式之间切换</li>
+                      <li><strong>数据图表</strong>: 可视化展示选定寄存器的值变化趋势</li>
+                      <li><strong>变化历史</strong>: 记录寄存器值的所有变化</li>
+                      <li><strong>生成测试代码</strong>: 自动生成Python测试脚本</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 编辑寄存器模态框 -->
+  <div class="modal fade" id="edit-register-modal" tabindex="-1" aria-labelledby="edit-register-modal-label" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="edit-register-modal-label">编辑寄存器</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="edit-address" class="form-label">地址</label>
+            <input type="text" class="form-control" id="edit-address" readonly>
+          </div>
+          <div class="mb-3">
+            <label for="edit-name" class="form-label">名称</label>
+            <input type="text" class="form-control" id="edit-name" readonly>
+          </div>
+          <div class="mb-3">
+            <label for="edit-value" class="form-label">值</label>
+            <input type="text" class="form-control" id="edit-value">
+          </div>
+          <div class="mb-3" id="bit-editor" style="display: none;">
+            <label class="form-label">位编辑器</label>
+            <div id="bit-editor-container" class="d-flex flex-wrap"></div>
+          </div>
+          
+          <input type="hidden" id="edit-type">
+          <input type="hidden" id="edit-real-address">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="button" class="btn btn-primary" id="save-register-btn">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Python测试脚本模态框 -->
+  <div class="modal fade" id="python-modal" tabindex="-1" aria-labelledby="python-modal-label" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="python-modal-label">生成Python测试脚本</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">选择寄存器地址</label>
+            <div id="python-register-checkboxes" class="mb-3">
+              <!-- 寄存器选项将通过JavaScript动态填充 -->
+            </div>
+          </div>
+          <div class="mb-3">
+            <label for="python-ip" class="form-label">服务器IP</label>
+            <input type="text" class="form-control" id="python-ip">
+          </div>
+          <div class="mb-3">
+            <label for="python-port" class="form-label">服务器端口</label>
+            <input type="number" class="form-control" id="python-port" value="502">
+          </div>
+          <div id="python-code-container" style="display: none;">
+            <label class="form-label">生成的Python代码</label>
+            <div class="python-code" id="python-code"></div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+          <button type="button" class="btn btn-primary" id="generate-python-code-btn">生成代码</button>
+          <button type="button" class="btn btn-success" id="save-python-btn" style="display: none;">
+            <i class="fas fa-save me-1"></i>保存脚本
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- 使用直接链接加载 JavaScript 库，避免路径问题 -->
+  <script src="./node_modules/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="./node_modules/chart.js/dist/chart.umd.js"></script>
+  
+  <!-- 调试信息 - 使用外部文件代替内联脚本 -->
+  <script src="debug.js"></script>
+  
+  <!-- 主应用脚本 -->
+  <script src="renderer.js"></script>
+</body>
+</html>
